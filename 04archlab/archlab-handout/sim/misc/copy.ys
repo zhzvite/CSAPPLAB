@@ -1,0 +1,45 @@
+# copy.ys: Copy a source block to a destination block
+# autor Vite
+# exe begins in address 0
+        .pos 0
+        irmovq stack , %rsp
+        call main
+        halt 
+#Sample linked 
+        .align 8
+# Source block
+src:
+        .quad 0x00a
+        .quad 0x0b0
+        .quad 0xc00
+# Destination block
+dest:
+        .quad 0x111
+        .quad 0x222
+        .quad 0x333
+
+# make main
+main:
+        irmovq src , %rdi
+        irmovq dest, %rsi
+        irmovq $3 , %rdx
+        xorq %rax,%rax 
+        call copy_block
+        ret
+        
+copy_block:
+        andq %rdx,%rdx
+        je return 
+        mrmovq (%rdi), %r8
+        rmmovq %r8, (%rsi)
+        xorq %r8, %rax
+        irmovq $8 ,%r8
+        addq %r8,%rdi
+        addq %r8,%rsi
+        irmovq $1, %r8
+        subq %r8 ,%rdx
+        call copy_block
+return :
+        ret
+    .pos 0x200
+ stack: 

@@ -1,0 +1,43 @@
+S 18d0cc,1 miss 
+L 18d100,8 miss //
+L 18d0c4,4 hit 
+L 18d0c0,4 hit 
+//
+L 10d0c0,4 miss eviction 
+L 10d0c4,4 hit 
+L 10d0c8,4 hit 
+L 10d0cc,4 hit 
+L 10d0d0,4 hit 
+L 10d0d4,4 hit 
+L 10d0d8,4 hit 
+L 10d0dc,4 hit 
+//
+//10100110100 ||00110|| 00000
+S 14d0c0,4 miss eviction 
+//10100110100    00110  10000
+S 14d0d0,4 hit 
+//101001101     0000111 00000
+S 14d0e0,4 miss 
+S 14d0f0,4 hit 
+S 14d0c4,4 hit 
+S 14d0d4,4 hit 
+S 14d0e4,4 hit 
+S 14d0f4,4 hit 
+L 10d0e0,4 miss eviction 
+L 10d0e4,4 hit 
+L 10d0e8,4 hit 
+L 10d0ec,4 hit 
+L 10d0f0,4 hit 
+L 10d0f4,4 hit 
+L 10d0f8,4 hit 
+L 10d0fc,4 hit 
+S 14d0c8,4 hit 
+S 14d0d8,4 hit 
+S 14d0e8,4 miss eviction 
+S 14d0f8,4 hit 
+S 14d0cc,4 hit 
+S 14d0dc,4 hit 
+S 14d0ec,4 hit 
+S 14d0fc,4 hit 
+S 18d0cd,1 miss eviction 
+hits:29 misses:8 evictions:5
