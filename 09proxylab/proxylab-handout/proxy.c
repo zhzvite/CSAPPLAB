@@ -1,4 +1,5 @@
 #include "csapp.h"
+#define MAX_CACHE 10
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
@@ -6,15 +7,36 @@
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
 
-void handleRequest(int);
-void clientError(int , char* , char* , char* , char* );
+void handlerequest(int);
+void Clienterror(int , char* , char* , char* , char* );
 int MakeClientRequest(rio_t* , char* , char*, char* , char* , char* , char*, char*);
 int checkGetMethod(char* , char* , char* );
 void replaceHTTPVersion(char* );
 void parseLine(char* , char*, char* , char* , char* , char*, char*);
+void *thread(void *v);
+void rwlock_init();
+struct rwlock_t{
+    sem_t lock;
+    sem_t writelock;
+    int readers;
+};
+
+struct Cache{
+    int used;
+    char key[MAXLINE];
+    char value[MAX_OBJECT_SIZE];
+};
+
+int nowpointer;
+struct Cache cache[MAXLINE];
+struct rwlock_t *rw;
+
 int main(int argc,char **argv)
 {
+    rw= Malloc(sizeof(struct rwlock_t));
+    pthread_t tid;
     int listenfd,connfd;
+    rwlock_init();
     char hostname[MAXLINE],port[MAXLINE];
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
@@ -33,15 +55,29 @@ int main(int argc,char **argv)
         printf("Accepted connection from (%s , %s)\n", hostname ,port);// accept了
 
         //Connection Succeed
-        handlerequest(connfd);
-        Close(connfd);
+       Pthread_create(&tid,NULL,(void*) thread,(void*)&connfd);
     }
     return 0;
 }
-
+void rwlock_init(){
+    rw->readers=0;
+    sem_init(&rw->lock,0,1);
+    /*
+    sem_init 是一个用于初始化信号量的函数。这里初始化了 rw->lock 信号量。
+    0 表示信号量用于线程间同步（而非进程间同步）。
+    1 表示信号量的初始值为 1，即该信号量是一个二值信号量，用于互斥访问。
+    */
+    sem_init(&rw->writelock,0,1);
+}
+void *thread(void *v){
+    int fd=*(int*)v;
+    Pthread_detach(pthread_self());
+    handlerequest(fd);
+   // Free(v);
+    Close(fd);
+    return ;
+}
 void handlerequest(int fd){
-    int is_static;
-    struct stat sbuf;
     char buf[MAXLINE],method[MAXLINE],uri[MAXLINE],version[MAXLINE];// buf 
     char filename[MAXLINE];
     //request header
@@ -63,7 +99,7 @@ void handlerequest(int fd){
     replaceHTTPVersion(buf);
    parseLine(buf,host,port,method,uri,version,filename);
     if(strcasecmp(method, "GET")){
-        clienterror(fd, method, "501", "Not Implemented",
+        Clienterror(fd, method, "501", "Not Implemented",
                     "Tiny does not implement this method");
         return ;
     }
@@ -87,16 +123,23 @@ void handlerequest(int fd){
     Rio_writen(riotiny.rio_fd, clientRequest, strlen(clientRequest));
 
     /** step4: read the response from tiny and send it to the client */
+
     printf("---prepare to get the response---- \n");
     char tinyResponse[MAXLINE];
 
     int n;
     
-    while( (n = Rio_readnb(&riotiny, tinyResponse, MAXLINE)) != 0){
+    while( (n = Rio_readlineb(&riotiny, tinyResponse, MAXLINE)) != 0){
         Rio_writen(fd, tinyResponse, n);
+
     }
+
+    close(clientfd);
+    return ;
+
     
 }
+
 int MakeClientRequest(rio_t* rio, char* clientRequest, char* Host, char* port,
                         char* method, char* uri, char* version, char* fileName){
     int UserAgent = 0, Connection = 0, ProxyConnection = 0, HostInfo = 0;
@@ -183,7 +226,8 @@ void parseLine(char* buf, char* host, char* port, char* method, char* uri, char*
 
 }
 // html headers and response body
-void clienterror(int fd,char *cause,char *errnum, char *shortmsg, char *longmsg){
+void Clienterror(int fd,char *cause,char *errnum, char *shortmsg, char *longmsg)
+{
     char buf[MAXLINE];
     /* Print the HTTP response headers */
     sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
