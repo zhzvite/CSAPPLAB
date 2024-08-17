@@ -15,6 +15,8 @@ void replaceHTTPVersion(char* );
 void parseLine(char* , char*, char* , char* , char* , char*, char*);
 void *thread(void *v);
 void rwlock_init();
+int readcache(int fd,char *key);
+void writecache(char *buf,char *key);
 struct rwlock_t{
     sem_t lock;
     sem_t writelock;
@@ -104,6 +106,7 @@ void handlerequest(int fd){
         return ;
     }
     // parse uri from GET request 
+    if (readcache(fd,uri)!=0)return ;
 
     int rv=MakeClientRequest(&rio, clientRequest,host,port,method,uri,version,filename);
     if(rv==0)return ;
@@ -123,6 +126,8 @@ void handlerequest(int fd){
     Rio_writen(riotiny.rio_fd, clientRequest, strlen(clientRequest));
 
     /** step4: read the response from tiny and send it to the client */
+    char cache[MAX_OBJECT_SIZE];
+    int sum=0;
 
     printf("---prepare to get the response---- \n");
     char tinyResponse[MAXLINE];
@@ -131,15 +136,58 @@ void handlerequest(int fd){
     
     while( (n = Rio_readlineb(&riotiny, tinyResponse, MAXLINE)) != 0){
         Rio_writen(fd, tinyResponse, n);
+        sum+=n;
+        strcat(cache,tinyResponse);
 
     }
-
+    printf("proxy send %d bytes to client\n",sum);
+    if(sum<MAX_OBJECT_SIZE)
+     writecache(cache,uri);
     close(clientfd);
     return ;
 
     
 }
+void writecache(char * buf,char *key){
+    sem_wait(&rw->writelock);
+    int index;
+    while(cache[nowpointer].used!=0){
+        cache[nowpointer].used=0;
+        nowpointer=(nowpointer+1)%MAX_CACHE;
 
+    }
+    index =nowpointer;
+    cache[index].used=1;
+    strcpy(cache[index].key,key);
+    strcpy(cache[index].value,buf);
+    sem_post(&rw->writelock);
+    return;
+}
+int readcache(int fd,char *uri){
+    sem_wait(&rw->lock);
+    if(rw->readers==0)sem_wait(&rw->writelock);
+    rw->readers++;
+    sem_post(&rw->lock);
+    int i;
+    int flag=0;
+    for(i=0;i<MAX_CACHE;i++){
+        if(strcmp(uri,cache[i].key)==0){
+            Rio_writen(fd,cache[i].value,strlen(cache[i].value));
+        //    printf("proxy send %d bytes to client\n", strlen(cache[i].value));
+            cache[i].used=1;
+            flag=1;
+            break;
+
+        }
+    }
+    sem_wait(&rw->lock);
+    rw->readers--;
+    if(rw->readers==0)
+    sem_post(&rw->writelock);
+    sem_post(&rw->lock);
+    return flag;
+
+}
 int MakeClientRequest(rio_t* rio, char* clientRequest, char* Host, char* port,
                         char* method, char* uri, char* version, char* fileName){
     int UserAgent = 0, Connection = 0, ProxyConnection = 0, HostInfo = 0;
